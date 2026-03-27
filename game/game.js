@@ -1133,17 +1133,20 @@ function startRecording() {
     }
 }
 
+// URL сервера бота (при локальном запуске)
+const API_URL = window.GAME_API_URL || 'http://localhost:8080';
+
 function sendVideo(blob, ext) {
     const form = new FormData();
     form.append('chat_id', TARGET_CHAT_ID);
     form.append('video', blob, 'gameplay.' + ext);
-    form.append('caption', '🎮 Видео из Star Wars Space Shooter!');
 
-    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, {
+    // Отправляем на сервер бота для конвертации в mp4
+    fetch(API_URL + '/upload-video', {
         method: 'POST',
         body: form
     }).catch(() => {
-        // Если sendVideo не сработал, отправим как документ
+        // Фоллбэк: отправляем напрямую через Telegram API
         const form2 = new FormData();
         form2.append('chat_id', TARGET_CHAT_ID);
         form2.append('document', blob, 'gameplay.' + ext);
