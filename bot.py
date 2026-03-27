@@ -21,6 +21,7 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    logging.info(f"USER: @{message.from_user.username} | chat_id: {message.chat.id} | user_id: {message.from_user.id}")
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [

