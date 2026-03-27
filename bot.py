@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 # URL твоей игры на GitHub Pages (заменить на свой!)
-GAME_URL = os.getenv("GAME_URL", "https://USERNAME.github.io/telegram-bot/game/")
+GAME_URL = os.getenv("GAME_URL", "https://elmar-afk.github.io/telega/game/")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
