@@ -62,7 +62,7 @@ let enemiesPerWave = 5;
 let bossActive = false;
 
 // Звёзды + туманности фона
-for (let i = 0; i < 120; i++) {
+for (let i = 0; i < 60; i++) {
     stars.push({
         x: Math.random() * W,
         y: Math.random() * H,
@@ -72,17 +72,8 @@ for (let i = 0; i < 120; i++) {
     });
 }
 
-// Фоновые туманности
+// Фоновые туманности отключены для производительности
 let nebulae = [];
-for (let i = 0; i < 3; i++) {
-    nebulae.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        radius: 80 + Math.random() * 120,
-        color: ['rgba(50,20,80,0.15)', 'rgba(20,40,80,0.12)', 'rgba(80,20,30,0.1)'][i],
-        speed: 0.2 + Math.random() * 0.3
-    });
-}
 
 // === УПРАВЛЕНИЕ ===
 
@@ -162,7 +153,7 @@ function activateBomb() {
     enemies = [];
     enemyBullets = [];
 
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 25; i++) {
         particles.push({
             x: W / 2, y: H / 2,
             vx: (Math.random() - 0.5) * 25,
@@ -180,7 +171,7 @@ function spawnExplosion(x, y, radius) {
     explosions.push({ x, y, radius, maxRadius: radius, life: 20 });
 
     // Кольцо частиц
-    const count = Math.floor(radius / 2);
+    const count = Math.floor(radius / 4);
     for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 / count) * i;
         const speed = 2 + Math.random() * 4;
@@ -194,7 +185,7 @@ function spawnExplosion(x, y, radius) {
         });
     }
     // Осколки
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
         particles.push({
             x, y,
             vx: (Math.random() - 0.5) * 8,
@@ -208,6 +199,8 @@ function spawnExplosion(x, y, radius) {
 }
 
 function spawnParticles(x, y, color, count) {
+    // Лимит частиц для производительности
+    if (particles.length > 150) return;
     for (let i = 0; i < count; i++) {
         particles.push({
             x, y,
@@ -346,10 +339,7 @@ function drawPlayer() {
     ctx.save();
     ctx.translate(player.x, player.y);
 
-    // Свечение оружия
     const wColor = WEAPONS[player.weapon].color;
-    ctx.shadowColor = wColor;
-    ctx.shadowBlur = 10;
 
     // Корпус
     ctx.fillStyle = '#00aaff';
@@ -362,8 +352,6 @@ function drawPlayer() {
     ctx.lineTo(player.width / 2, player.height / 2);
     ctx.closePath();
     ctx.fill();
-
-    ctx.shadowBlur = 0;
 
     // Крылья — акцент оружия
     ctx.fillStyle = wColor;
@@ -383,11 +371,7 @@ function drawPlayer() {
 
     // Двигатель
     const flameH = 10 + Math.random() * 12;
-    const grad = ctx.createLinearGradient(0, player.height / 2.5, 0, player.height / 2.5 + flameH);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(0.3, '#ffaa00');
-    grad.addColorStop(1, 'rgba(255,68,0,0)');
-    ctx.fillStyle = grad;
+    ctx.fillStyle = Math.random() > 0.5 ? '#ffaa00' : '#ff4400';
     ctx.beginPath();
     ctx.moveTo(-10, player.height / 2.5);
     ctx.lineTo(0, player.height / 2.5 + flameH);
@@ -405,9 +389,6 @@ function drawEnemy(e) {
     if (e.type === 'boss') {
         // Босс — большой корабль
         e.angle += 0.02;
-        ctx.shadowColor = '#ff0000';
-        ctx.shadowBlur = 15;
-
         ctx.fillStyle = '#880000';
         ctx.beginPath();
         ctx.moveTo(0, -e.height / 2);
@@ -429,8 +410,6 @@ function drawEnemy(e) {
         ctx.beginPath();
         ctx.arc(0, 0, 25 + Math.sin(e.angle * 3) * 5, 0, Math.PI * 2);
         ctx.stroke();
-
-        ctx.shadowBlur = 0;
 
         // HP бар босса
         ctx.fillStyle = '#333';
@@ -495,26 +474,17 @@ function drawExplosions() {
         ctx.stroke();
 
         // Внутреннее свечение
-        const grad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, r * 0.6);
-        grad.addColorStop(0, `rgba(255, 255, 200, ${(1 - progress) * 0.5})`);
-        grad.addColorStop(1, `rgba(255, 100, 0, 0)`);
-        ctx.fillStyle = grad;
+        // Внутреннее свечение (простое)
+        ctx.globalAlpha = (1 - progress) * 0.4;
+        ctx.fillStyle = '#ffcc66';
         ctx.beginPath();
-        ctx.arc(ex.x, ex.y, r * 0.6, 0, Math.PI * 2);
+        ctx.arc(ex.x, ex.y, r * 0.4, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalAlpha = 1;
     }
 }
 
 function drawStars() {
-    // Туманности
-    for (let n of nebulae) {
-        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
-        grad.addColorStop(0, n.color);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(n.x - n.radius, n.y - n.radius, n.radius * 2, n.radius * 2);
-    }
-
     // Звёзды
     for (let s of stars) {
         ctx.globalAlpha = 0.3 + s.size / 3;
@@ -528,8 +498,6 @@ function drawBullets() {
     for (let b of bullets) {
         ctx.save();
         if (b.type === 'laser') {
-            ctx.shadowColor = b.color;
-            ctx.shadowBlur = 8;
             ctx.fillStyle = b.color;
             ctx.fillRect(b.x - b.width / 2, b.y - b.height / 2, b.width, b.height);
             ctx.fillStyle = '#fff';
@@ -1001,14 +969,10 @@ function render() {
     // Бонусы
     for (let p of powerUps) {
         const col = getPowerUpColor(p.type);
-        // Свечение
-        ctx.shadowColor = col;
-        ctx.shadowBlur = 8;
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
