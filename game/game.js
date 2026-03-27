@@ -114,7 +114,11 @@ canvas.addEventListener('click', e => {
 
 // === ГОЛОСОВОЕ УПРАВЛЕНИЕ ===
 
+let voiceInited = false;
 function initVoice() {
+    if (voiceInited) return;
+    voiceInited = true;
+
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { micStatus = 'Нет поддержки'; return; }
 
