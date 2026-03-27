@@ -111,7 +111,7 @@ async def handle_upload_video(request):
 
         # Конвертируем webm -> mp4 через ffmpeg
         proc = await asyncio.create_subprocess_exec(
-            'ffmpeg', '-y', '-i', webm_path,
+            os.path.join(os.path.dirname(__file__), 'ffmpeg'), '-y', '-i', webm_path,
             '-c:v', 'libx264', '-preset', 'ultrafast',
             '-crf', '28', '-movflags', '+faststart',
             '-pix_fmt', 'yuv420p',
